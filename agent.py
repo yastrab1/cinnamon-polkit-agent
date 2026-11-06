@@ -31,6 +31,33 @@ def display_name(username):
     return gecos or username
 
 
+def init_layer_shell(window):
+    """Put the window on the wlr-layer-shell overlay layer with exclusive keyboard
+    focus (like a lock screen), so it gets typed input without a click.
+
+    Uses libgtk-layer-shell through ctypes, so its GI typelib isn't needed.
+    Returns False when unavailable (X11, or a compositor without layer-shell)."""
+    import ctypes
+    try:
+        lib = ctypes.CDLL("libgtk-layer-shell.so.0")
+    except OSError:
+        return False
+    if not lib.gtk_layer_is_supported():
+        return False
+    get_ptr = ctypes.pythonapi.PyCapsule_GetPointer
+    get_ptr.restype = ctypes.c_void_p
+    get_ptr.argtypes = [ctypes.py_object, ctypes.c_char_p]
+    win = ctypes.c_void_p(get_ptr(window.__gpointer__, None))
+    lib.gtk_layer_init_for_window(win)
+    lib.gtk_layer_set_namespace(win, b"polkit-agent")
+    lib.gtk_layer_set_layer(win, 3)  # GTK_LAYER_SHELL_LAYER_OVERLAY
+    for edge in range(4):  # LEFT, RIGHT, TOP, BOTTOM
+        lib.gtk_layer_set_anchor(win, edge, 1)
+    lib.gtk_layer_set_exclusive_zone(win, -1)
+    lib.gtk_layer_set_keyboard_mode(win, 1)  # GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE
+    return True
+
+
 class AuthDialog(Gtk.Window):
     def __init__(self, message, cookie, identities, on_done):
         super().__init__(type=Gtk.WindowType.TOPLEVEL)
@@ -73,7 +100,8 @@ class AuthDialog(Gtk.Window):
         self.connect("button-release-event", self.on_release)
         self.connect("delete-event", lambda *a: (self.cancel(), True)[1])
         self.blink_id = GLib.timeout_add(CARET_BLINK_MS, self.blink)
-        self.fullscreen()
+        if not init_layer_shell(self):
+            self.fullscreen()
 
     # ---- drawing / input -------------------------------------------------
     def on_draw(self, widget, cr):
@@ -130,6 +158,8 @@ class AuthDialog(Gtk.Window):
 
     def on_key(self, _w, ev):
         key = ev.keyval
+        if os.environ.get("POLKIT_AGENT_DEBUG"):
+            print("key", Gdk.keyval_name(key), ev.time, ev.hardware_keycode, flush=True)
         if key == Gdk.KEY_Escape:
             self.cancel()
         elif key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):

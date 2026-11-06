@@ -68,7 +68,7 @@ Test it with `pkexec true`.
   no user-switch menu.
 - It shows the generic avatar icon, not your account picture, and it has no
   open/close fade animation.
-- The dimmed backdrop needs a compositor that honours window transparency.
+- On Wayland it uses wlr-layer-shell (via `libgtk-layer-shell`, loaded with ctypes) to sit on the overlay layer with exclusive keyboard focus. Without layer-shell it falls back to a fullscreen window, which some compositors may not focus.
 
 ## License
 
