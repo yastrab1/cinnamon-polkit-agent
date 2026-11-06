@@ -158,8 +158,6 @@ class AuthDialog(Gtk.Window):
 
     def on_key(self, _w, ev):
         key = ev.keyval
-        if os.environ.get("POLKIT_AGENT_DEBUG"):
-            print("key", Gdk.keyval_name(key), ev.time, ev.hardware_keycode, flush=True)
         if key == Gdk.KEY_Escape:
             self.cancel()
         elif key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
